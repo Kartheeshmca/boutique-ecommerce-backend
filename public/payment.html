@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Razorpay Payment</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+  <h2>Razorpay Payment Demo</h2>
+  <button id="payButton">Pay Now</button>
+
+  <script>
+    // Replace with your real values
+    const JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4ZDc3ZTZlYmM0YjZhZTA1YTJmY2I5MSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzU5MjE5MjY3LCJleHAiOjE3NTkzMDU2Njd9.rM8AR4LV5wL0vUmPpry5_FQ7XBUWMpbtgIJ3lzHFFiw";      // JWT from login
+    const ORDER_ID = "68d8268ca6a4a614fda111cf";  // Order _id from DB
+
+    document.getElementById("payButton").onclick = async function () {
+      try {
+        // 1️⃣ Create order via backend
+        const res = await fetch("http://localhost:7000/api/payments/create", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "token": JWT_TOKEN
+          },
+          body: JSON.stringify({ orderId: ORDER_ID })
+        });
+        
+        
+        
+        
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert("Error creating payment: " + data.message);
+          return;
+        }
+
+        // 2️⃣ Open Razorpay checkout
+        const options = {
+          key: "rzp_test_RNjlc0vHMbznn4", // Razorpay Key ID
+          amount: data.payment.amount * 100, // in paise
+          currency: "INR",
+          name: "Your Store",
+          description: "Test Payment",
+          order_id: data.razorpayOrder.id,
+          handler: async function(response) {
+              console.log("Razorpay Payment ID:", response.razorpay_payment_id);
+            console.log("Razorpay Order ID:", response.razorpay_order_id);
+            console.log("Razorpay Signature:", response.razorpay_signature);
+            // 3️⃣ Verify payment
+            const verifyRes = await fetch("http://localhost:7000/api/payments/verify", {
+              method: "POST",
+              headers: { 
+                "Content-Type": "application/json",
+                "token": JWT_TOKEN
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+            
+            
+            
+            
+            const verifyData = await verifyRes.json();
+            alert("Payment Verification Result:\n" + JSON.stringify(verifyData, null, 2));
+          },
+          prefill: { 
+            name: "Customer Name", 
+            email: "customer@example.com" 
+          },
+          theme: { color: "#3399cc" }
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.open();
+
+      } catch (err) {
+        console.error(err);
+        alert("Something went wrong: " + err.message);
+      }
+    };
+  </script>
+</body>
+</html>
