@@ -10,8 +10,8 @@ const router = express.Router();
 router.post("/create", Auth, createOrder);
 router.get("/all", Auth, getAllOrders);
 router.get("/byId/:id", Auth, getOrderById);
-router.put("/update/:id", Auth, authorizeRoles("admin"), updateOrder);
-router.delete("/delete/:id", Auth, authorizeRoles("admin"), deleteOrder);
+router.put("/update/:id", Auth, updateOrder);
+router.delete("/delete/:id", Auth, deleteOrder);
 
 router.post("/confirm/:id", Auth, authorizeRoles("admin"), async (req, res) => {
   const result = await confirmOrderPayment(req.params.id);
@@ -27,3 +27,4 @@ router.post("/refund/:id", Auth, authorizeRoles("admin"), async (req, res) => {
 });
 
 export default router;
+
