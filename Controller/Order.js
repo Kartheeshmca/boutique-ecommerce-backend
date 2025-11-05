@@ -55,28 +55,38 @@ export const getOrderById = async (req, res) => {
   }
 };
 
-
-// ✅ Update Order (Admin)
+// ✅ Update Order (User can update only their own order)
 export const updateOrder = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "admin") return res.status(403).json({ message: "Admin access required" });
-
-    const order = await Order.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const order = await Order.findById(req.params.id).populate("user", "email");
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    res.json({ success: true, message: "Order updated", order });
+    // Check if logged-in user's email matches order owner's email
+    if (!req.user || order.user.email !== req.user.email) {
+      return res.status(403).json({ message: "You can only update your own order" });
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    });
+
+    res.json({ success: true, message: "Order updated successfully", order: updatedOrder });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// ✅ Delete Order (Admin)
+// ✅ Delete Order (User can delete only their own order)
 export const deleteOrder = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "admin") return res.status(403).json({ message: "Admin access required" });
-
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(req.params.id).populate("user", "email");
     if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // Check if logged-in user's email matches order owner's email
+    if (!req.user || order.user.email !== req.user.email) {
+      return res.status(403).json({ message: "You can only delete your own order" });
+    }
 
     await OrderItem.deleteMany({ order: order._id });
     if (order.payment) await Payment.findByIdAndUpdate(order.payment, { status: "cancelled" });
@@ -85,11 +95,12 @@ export const deleteOrder = async (req, res) => {
     await order.save();
     await Order.findByIdAndDelete(order._id);
 
-    res.json({ success: true, message: "Order and related items deleted" });
+    res.json({ success: true, message: "Order and related items deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // ✅ Get All Orders
 export const getAllOrders = async (req, res) => {
@@ -159,16 +170,37 @@ export const getAllOrders = async (req, res) => {
 
 
 // ✅ Confirm Payment
+// ✅ Confirm order payment and send email
 export const confirmOrderPayment = async (orderId) => {
   try {
-    const order = await Order.findById(orderId).populate("user", "name email");
+    const order = await Order.findById(orderId)
+      .populate("user", "firstName lastName email");
+
     if (!order) return { success: false, message: "Order not found" };
 
+    // ✅ Update order status
     order.status = "confirmed";
     await order.save();
 
-    if (order.user?.email) {
-      await sendEmail(order.user.email, `Order #${order._id} Confirmed`, `Hi ${order.user.name}, your payment has been received. Order ID: ${order._id}, Total: ₹${order.total_amount}`);
+    // ✅ Send email if user info exists
+    if (order.user && order.user.email) {
+      const userName = `${order.user.firstName || ""} ${order.user.lastName || ""}.trim() || "Customer"`;
+      const subject = `Your Order #${order._id} is Confirmed`;
+      const text = `Hi ${userName},\n\nYour payment has been successfully received and your order is confirmed.\n\nOrder ID: ${order._id}\nTotal Amount: ₹${order.total_amount}\n\nThank you for shopping with us!`;
+
+      const html = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9;">
+          <div style="max-width: 600px; margin: auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <h2 style="color: #4CAF50;">Order Confirmed ✅</h2>
+            <p>Hi <b>${userName}</b>,</p>
+            <p>Your payment has been successfully received and your order is confirmed.</p>
+            <p><b>Order ID:</b> ${order._id}<br/><b>Total:</b> ₹${order.total_amount}</p>
+            <p>Thank you for shopping with us!</p>
+          </div>
+        </div>
+      `;
+
+      await sendEmail(order.user.email, subject, text, html);
     }
 
     return { success: true, message: "Order confirmed and email sent", order };
@@ -177,7 +209,6 @@ export const confirmOrderPayment = async (orderId) => {
     return { success: false, message: error.message };
   }
 };
-
 // ✅ Refund Payment
 export const refundOrderPayment = async (orderId, amount) => {
   try {
