@@ -167,8 +167,6 @@ export const getAllOrders = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
-
 // ✅ Confirm Payment
 // ✅ Confirm order payment and send email
 export const confirmOrderPayment = async (orderId) => {
@@ -187,7 +185,6 @@ export const confirmOrderPayment = async (orderId) => {
       const userName = `${order.user.firstName || ""} ${order.user.lastName || ""}.trim() || "Customer"`;
       const subject = `Your Order #${order._id} is Confirmed`;
       const text = `Hi ${userName},\n\nYour payment has been successfully received and your order is confirmed.\n\nOrder ID: ${order._id}\nTotal Amount: ₹${order.total_amount}\n\nThank you for shopping with us!`;
-
       const html = `
         <div style="font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9;">
           <div style="max-width: 600px; margin: auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
@@ -199,17 +196,14 @@ export const confirmOrderPayment = async (orderId) => {
           </div>
         </div>
       `;
-
       await sendEmail(order.user.email, subject, text, html);
     }
-
     return { success: true, message: "Order confirmed and email sent", order };
   } catch (error) {
     console.error("Confirm Order Error:", error.message);
     return { success: false, message: error.message };
   }
 };
-// ✅ Refund Payment
 export const refundOrderPayment = async (orderId, amount) => {
   try {
     const order = await Order.findById(orderId).populate("user", "name email");
